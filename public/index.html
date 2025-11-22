@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TinyLink Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 30px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 10px; text-align: left; }
+    input[type="text"] { width: 80%; padding: 8px; }
+    button { padding: 8px 16px; }
+    td.url-cell { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <h1>TinyLink Dashboard</h1>
+
+  <form id="urlForm">
+    <input type="text" id="longUrl" placeholder="Enter full URL here" required>
+    <button type="submit">Shorten URL</button>
+  </form>
+
+  <table id="urlTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Original URL</th>
+        <th>Short URL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- URLs will appear here -->
+    </tbody>
+  </table>
+
+  <script>
+    const form = document.getElementById('urlForm');
+    const tableBody = document.getElementById('urlTable').querySelector('tbody');
+    let idCounter = 1; // temporary ID for demo
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const longUrl = document.getElementById('longUrl').value.trim();
+      if (!longUrl) return;
+
+      // Simple short URL generator (demo)
+      const shortUrl = 'tiny.ly/' + Math.random().toString(36).substring(2, 8);
+
+      // Add to table
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${idCounter++}</td>
+        <td class="url-cell" title="${longUrl}">${longUrl}</td>
+        <td><a href="${longUrl}" target="_blank">${shortUrl}</a></td>
+      `;
+      tableBody.appendChild(row);
+
+      form.reset();
+    });
+  </script>
+</body>
+</html>

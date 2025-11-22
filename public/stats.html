@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Link Stats</title>
+  <style>
+    body { font-family: Arial; margin: 30px; }
+    p { font-size: 18px; }
+  </style>
+</head>
+<body>
+
+<h1>Stats</h1>
+
+<div id="info">Loading...</div>
+
+<script>
+  const BASE = "http://localhost:3000";
+
+  // URL format: /code/abc123
+  const parts = window.location.pathname.split("/");
+  const code = parts[parts.length - 1];
+
+  async function loadStats() {
+    const res = await fetch(BASE + "/api/links/" + code);
+
+    if (res.status === 404) {
+      document.getElementById("info").innerText = "Link not found!";
+      return;
+    }
+
+    const data = await res.json();
+
+    document.getElementById("info").innerHTML = `
+      <p><b>Code:</b> ${data.code}</p>
+      <p><b>URL:</b> ${data.url}</p>
+      <p><b>Clicks:</b> ${data.clicks}</p>
+      <p><b>Last Clicked:</b> ${data.last_clicked || "---"}</p>
+    `;
+  }
+
+  loadStats();
+</script>
+
+</body>
+</html>
