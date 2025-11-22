@@ -1,45 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Link Stats</title>
+  <meta charset="UTF-8" />
+  <title>TinyLink — Stats</title>
   <style>
-    body { font-family: Arial; margin: 30px; }
-    p { font-size: 18px; }
-  </style>
-</head>
-<body>
-
-<h1>Stats</h1>
-
-<div id="info">Loading...</div>
-
-<script>
-  const BASE = "http://localhost:3000";
-
-  // URL format: /code/abc123
-  const parts = window.location.pathname.split("/");
-  const code = parts[parts.length - 1];
-
-  async function loadStats() {
-    const res = await fetch(BASE + "/api/links/" + code);
-
-    if (res.status === 404) {
-      document.getElementById("info").innerText = "Link not found!";
-      return;
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      margin: 0;
+      padding: 25px;
+      background: #f4f6f8;
     }
 
-    const data = await res.json();
+    .card {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    }
 
-    document.getElementById("info").innerHTML = `
-      <p><b>Code:</b> ${data.code}</p>
-      <p><b>URL:</b> ${data.url}</p>
-      <p><b>Clicks:</b> ${data.clicks}</p>
-      <p><b>Last Clicked:</b> ${data.last_clicked || "---"}</p>
-    `;
-  }
+    h1 {
+      text-align: center;
+      margin-bottom: 25px;
+      font-size: 30px;
+      color: #333;
+    }
 
-  loadStats();
-</script>
+    p {
+      font-size: 18px;
+      margin: 10px 0;
+      color: #333;
+    }
+
+    .value {
+      font-weight: bold;
+      color: #007bff;
+    }
+
+    .back {
+      display: block;
+      margin-top: 25px;
+      text-align: center;
+      color: #007bff;
+      text-decoration: none;
+      font-size: 16px;
+    }
+
+    .back:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Link Statistics</h1>
+
+  <div class="card">
+    <div id="info">Loading...</div>
+  </div>
+
+  <a class="back" href="/index.html">← Back to Dashboard</a>
+
+  <script>
+    const BASE = "http://localhost:3000";
+
+    // URL format: stats.html?code=abc123
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+
+    async function loadStats() {
+      const res = await fetch(BASE + "/api/links/" + code);
+
+      if (res.status === 404) {
+        document.getElementById("info").innerHTML =
+          "<p style='color:red;'>Link not found!</p>";
+        return;
+      }
+
+      const data = await res.json();
+
+      document.getElementById("info").innerHTML = `
+        <p><b>Code:</b> <span class="value">${data.code}</span></p>
+        <p><b>Original URL:</b><br>
+           <span class="value">${data.url}</span></p>
+        <p><b>Total Clicks:</b> <span class="value">${data.clicks}</span></p>
+        <p><b>Last Clicked:</b> <span class="value">${data.last_clicked || "---"}</span></p>
+      `;
+    }
+
+    loadStats();
+  </script>
 
 </body>
 </html>

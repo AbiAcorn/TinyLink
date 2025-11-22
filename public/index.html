@@ -1,63 +1,146 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>TinyLink Dashboard</title>
+  <meta charset="utf-8" />
+  <title>TinyLink — Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; margin: 30px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-    table, th, td { border: 1px solid #ccc; }
-    th, td { padding: 10px; text-align: left; }
-    input[type="text"] { width: 80%; padding: 8px; }
-    button { padding: 8px 16px; }
-    td.url-cell { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    body{font-family:Segoe UI,Arial,sans-serif;margin:0;padding:20px;background:#f4f6f8}
+    h1{text-align:center;color:#333}
+    .card{max-width:900px;margin:0 auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,0.06)}
+    .row{display:flex;gap:10px;align-items:center}
+    input[type=text]{flex:1;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+    button{background:#007bff;color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer}
+    table{width:100%;margin-top:18px;border-collapse:collapse}
+    th{background:#007bff;color:#fff;padding:12px;text-align:left}
+    td{padding:10px;border-bottom:1px solid #eee;vertical-align:middle}
+    .muted{color:#666;font-size:13px}
+    .actions button{margin-right:6px}
+    .small-link{color:#007bff;text-decoration:underline;cursor:pointer}
+    .error{color:#c62828;margin-top:8px}
+    @media(max-width:700px){.row{flex-direction:column;align-items:stretch}}
   </style>
 </head>
 <body>
   <h1>TinyLink Dashboard</h1>
+  <div class="card">
+    <div style="margin-bottom:12px">
+      <div class="row">
+        <input id="longUrl" type="text" placeholder="Enter full URL (https://example.com)" />
+        <input id="customCode" type="text" placeholder="Custom code (optional - 6-8 alnum)" style="width:220px" />
+        <button id="createBtn">Shorten</button>
+      </div>
+      <div id="error" class="error"></div>
+    </div>
 
-  <form id="urlForm">
-    <input type="text" id="longUrl" placeholder="Enter full URL here" required>
-    <button type="submit">Shorten URL</button>
-  </form>
+    <table id="urlTable" aria-live="polite">
+      <thead>
+        <tr><th>Code</th><th>Original URL</th><th>Short URL</th><th>Clicks</th><th>Actions</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
-  <table id="urlTable">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Original URL</th>
-        <th>Short URL</th>
-      </tr>
-    </thead>
-    <tbody>
-      <!-- URLs will appear here -->
-    </tbody>
-  </table>
+<script>
+  // Use relative origin so it works whether port is 3000 or 5000 or deployed
+  const ORIGIN = window.location.origin;
 
-  <script>
-    const form = document.getElementById('urlForm');
-    const tableBody = document.getElementById('urlTable').querySelector('tbody');
-    let idCounter = 1; // temporary ID for demo
+  const errorEl = document.getElementById('error');
+  const tbody = document.querySelector('#urlTable tbody');
+  const createBtn = document.getElementById('createBtn');
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const longUrl = document.getElementById('longUrl').value.trim();
-      if (!longUrl) return;
+  async function loadLinks() {
+    errorEl.textContent = '';
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">Loading…</td></tr>';
+    try {
+      const res = await fetch(ORIGIN + '/api/links');
+      if (!res.ok) throw new Error('Failed to load');
+      const data = await res.json();
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">No links yet</td></tr>';
+        return;
+      }
 
-      // Simple short URL generator (demo)
-      const shortUrl = 'tiny.ly/' + Math.random().toString(36).substring(2, 8);
+      tbody.innerHTML = '';
+      data.forEach(link => {
+        const short = `${ORIGIN}/${link.code}`;
+        const tr = document.createElement('tr');
 
-      // Add to table
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${idCounter++}</td>
-        <td class="url-cell" title="${longUrl}">${longUrl}</td>
-        <td><a href="${longUrl}" target="_blank">${shortUrl}</a></td>
-      `;
-      tableBody.appendChild(row);
+        tr.innerHTML = `
+          <td><code>${link.code}</code></td>
+          <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${link.url}</td>
+          <td><a class="small-link" href="${short}" target="_blank">${short}</a></td>
+          <td>${link.clicks ?? 0}</td>
+          <td class="actions">
+            <button onclick="copyText('${short}')">Copy</button>
+            <button onclick="location.href='/stats/${link.code}'">Stats</button>
+            <button style="background:#dc3545;color:#fff" onclick="deleteLink('${link.code}')">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      tbody.innerHTML = '<tr><td colspan="5" class="muted">Could not load links</td></tr>';
+      console.error(err);
+    }
+  }
 
-      form.reset();
-    });
-  </script>
+  async function createLink() {
+    errorEl.textContent = '';
+    const url = document.getElementById('longUrl').value.trim();
+    const custom = document.getElementById('customCode').value.trim();
+
+    if (!url) { errorEl.textContent = 'Please enter a URL.'; return; }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) { errorEl.textContent = 'URL must start with http:// or https://'; return; }
+
+    createBtn.disabled = true;
+    createBtn.textContent = 'Creating...';
+
+    try {
+      const body = { url };
+      if (custom) body.customCode = custom;
+
+      const res = await fetch(ORIGIN + '/api/links', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        errorEl.textContent = json.error || 'Failed to create link';
+      } else {
+        // success
+        document.getElementById('longUrl').value = '';
+        document.getElementById('customCode').value = '';
+        await loadLinks();
+      }
+    } catch (err) {
+      console.error(err);
+      errorEl.textContent = 'Server error';
+    } finally {
+      createBtn.disabled = false;
+      createBtn.textContent = 'Shorten';
+    }
+  }
+
+  async function deleteLink(code) {
+    if (!confirm('Delete ' + code + '?')) return;
+    try {
+      await fetch(ORIGIN + '/api/links/' + code, { method: 'DELETE' });
+      loadLinks();
+    } catch (err) {
+      console.error(err);
+      alert('Delete failed');
+    }
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(()=> alert('Copied: ' + text));
+  }
+
+  createBtn.addEventListener('click', createLink);
+  loadLinks();
+</script>
 </body>
 </html>

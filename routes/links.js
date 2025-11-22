@@ -1,60 +1,91 @@
+// routes/links.js
 const express = require("express");
 const router = express.Router();
-const db = require("../db");
+const db = require("../db"); // must export Pool
 
-function genCode(len = 6) {
+// simple URL validator
+function isValidURL(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// random 6-char code
+function randomCode(len = 6) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let out = "";
-  for (let i = 0; i < len; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
+  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
   return out;
 }
 
-function isValidUrl(url) {
-  try { new URL(url); return true; }
-  catch { return false; }
-}
-
-router.post("/", async (req, res) => {
-  let { url, code } = req.body;
-
-  if (!isValidUrl(url)) return res.status(400).json({ error: "Invalid URL" });
-
-  if (!code) code = genCode(6);
-
-  if (!/^[A-Za-z0-9]{6,8}$/.test(code))
-    return res.status(400).json({ error: "Invalid code format" });
-
+// GET /api/links  -> list all links
+router.get("/", async (req, res) => {
   try {
-    const exists = await db.query("SELECT * FROM links WHERE code=$1", [code]);
-    if (exists.rows.length > 0) return res.status(409).json({ error: "Code exists" });
-
-    const result = await db.query(
-      "INSERT INTO links (code, url) VALUES ($1, $2) RETURNING *",
-      [code, url]
-    );
-
-    res.json(result.rows[0]);
+    const result = await db.query("SELECT * FROM links ORDER BY created_at DESC");
+    res.json(result.rows);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-router.get("/", async (req, res) => {
-  const result = await db.query("SELECT * FROM links ORDER BY id DESC");
-  res.json(result.rows);
+// POST /api/links -> create link
+// body: { url: "...", customCode?: "ABC123" }
+router.post("/", async (req, res) => {
+  try {
+    const { url, customCode } = req.body;
+
+    // URL validation
+    if (!url || !isValidURL(url)) {
+      return res.status(400).json({ error: "Invalid URL format. Use http:// or https://." });
+    }
+
+    const codeRegex = /^[A-Za-z0-9]{6,8}$/;
+    let code = customCode;
+
+    if (customCode) {
+      if (!codeRegex.test(customCode)) {
+        return res.status(400).json({ error: "Custom code must be 6-8 characters and only letters or numbers." });
+      }
+      // check duplicate
+      const exists = await db.query("SELECT 1 FROM links WHERE code = $1", [customCode]);
+      if (exists.rowCount > 0) return res.status(409).json({ error: "Custom code already exists." });
+    } else {
+      // generate unique code (retry if collision)
+      let tries = 0;
+      do {
+        code = randomCode(6);
+        const r = await db.query("SELECT 1 FROM links WHERE code = $1", [code]);
+        if (r.rowCount === 0) break;
+        tries++;
+      } while (tries < 5);
+    }
+
+    const insert = await db.query(
+      "INSERT INTO links (code, url, clicks, created_at) VALUES ($1, $2, $3, NOW()) RETURNING *",
+      [code, url, 0]
+    );
+
+    return res.status(201).json(insert.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
-router.get("/:code", async (req, res) => {
-  const result = await db.query("SELECT * FROM links WHERE code=$1", [req.params.code]);
-  if (result.rows.length === 0) return res.status(404).json({ error: "Not found" });
-  res.json(result.rows[0]);
-});
-
+// DELETE /api/links/:code -> delete link
 router.delete("/:code", async (req, res) => {
-  await db.query("DELETE FROM links WHERE code=$1", [req.params.code]);
-  res.json({ success: true });
+  try {
+    const { code } = req.params;
+    await db.query("DELETE FROM links WHERE code = $1", [code]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 module.exports = router;
