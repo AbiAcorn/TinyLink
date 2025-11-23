@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-const app = express();
 const cors = require('cors');
 const { Pool } = require('pg');
+const app = express();
 
 // Middleware
 app.use(cors());
@@ -19,6 +19,6 @@ app.get('/', (req, res) => {
   res.send('TinyLink is running!');
 });
 
-// Use Railway's dynamic port
+// Dynamic port for Railway
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
