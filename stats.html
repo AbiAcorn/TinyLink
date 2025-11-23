@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>TinyLink — Stats</title>
+</head>
+<body>
+
+<h1>Link Statistics</h1>
+<div id="info">Loading...</div>
+
+<script>
+  const ORIGIN = window.location.origin;
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+
+  fetch(ORIGIN + "/api/links/" + code)
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("info").innerHTML = `
+        <p>Code: ${data.code}</p>
+        <p>URL: ${data.url}</p>
+        <p>Clicks: ${data.clicks}</p>
+        <p>Last Clicked: ${data.last_clicked || "—"}</p>
+      `;
+    });
+</script>
+
+</body>
+</html>
