@@ -27,13 +27,13 @@
     <div style="margin-bottom:12px">
       <div class="row">
         <input id="longUrl" type="text" placeholder="Enter full URL (https://example.com)" />
-        <input id="customCode" type="text" placeholder="Custom code (optional - 6-8 alnum)" style="width:220px" />
+        <input id="customCode" type="text" placeholder="Custom code (optional)" style="width:220px" />
         <button id="createBtn">Shorten</button>
       </div>
       <div id="error" class="error"></div>
     </div>
 
-    <table id="urlTable" aria-live="polite">
+    <table id="urlTable">
       <thead>
         <tr><th>Code</th><th>Original URL</th><th>Short URL</th><th>Clicks</th><th>Actions</th></tr>
       </thead>
@@ -42,104 +42,93 @@
   </div>
 
 <script>
-  // Use relative origin so it works whether port is 3000 or 5000 or deployed
   const ORIGIN = window.location.origin;
+  const API = ORIGIN + "/api/links";
 
   const errorEl = document.getElementById('error');
   const tbody = document.querySelector('#urlTable tbody');
   const createBtn = document.getElementById('createBtn');
 
   async function loadLinks() {
-    errorEl.textContent = '';
     tbody.innerHTML = '<tr><td colspan="5" class="muted">Loading…</td></tr>';
     try {
-      const res = await fetch(ORIGIN + '/api/links');
-      if (!res.ok) throw new Error('Failed to load');
+      const res = await fetch(API);
       const data = await res.json();
+
+      tbody.innerHTML = "";
+
       if (!data.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="muted">No links yet</td></tr>';
         return;
       }
 
-      tbody.innerHTML = '';
       data.forEach(link => {
         const short = `${ORIGIN}/${link.code}`;
-        const tr = document.createElement('tr');
 
+        const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td><code>${link.code}</code></td>
-          <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${link.url}</td>
-          <td><a class="small-link" href="${short}" target="_blank">${short}</a></td>
-          <td>${link.clicks ?? 0}</td>
-          <td class="actions">
+          <td>${link.code}</td>
+          <td>${link.url}</td>
+          <td><a href="${short}" target="_blank">${short}</a></td>
+          <td>${link.clicks}</td>
+          <td>
             <button onclick="copyText('${short}')">Copy</button>
-            <button onclick="location.href='/stats/${link.code}'">Stats</button>
-            <button style="background:#dc3545;color:#fff" onclick="deleteLink('${link.code}')">Delete</button>
+            <button onclick="location.href='stats.html?code=${link.code}'">Stats</button>
+            <button onclick="deleteLink('${link.code}')" style="background:red;color:white">Delete</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     } catch (err) {
-      tbody.innerHTML = '<tr><td colspan="5" class="muted">Could not load links</td></tr>';
-      console.error(err);
+      tbody.innerHTML = '<tr><td colspan="5" class="muted">Error loading</td></tr>';
     }
   }
 
   async function createLink() {
-    errorEl.textContent = '';
     const url = document.getElementById('longUrl').value.trim();
-    const custom = document.getElementById('customCode').value.trim();
+    const customCode = document.getElementById('customCode').value.trim();
 
-    if (!url) { errorEl.textContent = 'Please enter a URL.'; return; }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) { errorEl.textContent = 'URL must start with http:// or https://'; return; }
+    if (!url) {
+      errorEl.textContent = "Please enter a URL.";
+      return;
+    }
+
+    errorEl.textContent = "";
 
     createBtn.disabled = true;
-    createBtn.textContent = 'Creating...';
+    createBtn.textContent = "Creating...";
 
-    try {
-      const body = { url };
-      if (custom) body.customCode = custom;
+    const res = await fetch(API, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ url, customCode })
+    });
 
-      const res = await fetch(ORIGIN + '/api/links', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(body)
-      });
+    const data = await res.json();
 
-      const json = await res.json();
-      if (!res.ok) {
-        errorEl.textContent = json.error || 'Failed to create link';
-      } else {
-        // success
-        document.getElementById('longUrl').value = '';
-        document.getElementById('customCode').value = '';
-        await loadLinks();
-      }
-    } catch (err) {
-      console.error(err);
-      errorEl.textContent = 'Server error';
-    } finally {
-      createBtn.disabled = false;
-      createBtn.textContent = 'Shorten';
-    }
-  }
-
-  async function deleteLink(code) {
-    if (!confirm('Delete ' + code + '?')) return;
-    try {
-      await fetch(ORIGIN + '/api/links/' + code, { method: 'DELETE' });
+    if (!res.ok) {
+      errorEl.textContent = data.error;
+    } else {
+      document.getElementById('longUrl').value = "";
+      document.getElementById('customCode').value = "";
       loadLinks();
-    } catch (err) {
-      console.error(err);
-      alert('Delete failed');
     }
+
+    createBtn.disabled = false;
+    createBtn.textContent = "Shorten";
   }
 
   function copyText(text) {
-    navigator.clipboard.writeText(text).then(()=> alert('Copied: ' + text));
+    navigator.clipboard.writeText(text);
+    alert("Copied: " + text);
   }
 
-  createBtn.addEventListener('click', createLink);
+  async function deleteLink(code) {
+    await fetch(API + "/" + code, { method: "DELETE" });
+    loadLinks();
+  }
+
+  createBtn.onclick = createLink;
   loadLinks();
 </script>
 </body>
