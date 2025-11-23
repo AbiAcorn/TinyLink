@@ -1,24 +1,28 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
+// server.js
+
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
+
 const app = express();
-
-// Middleware
-app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(cors());
 
-// Database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+// PostgreSQL connection
+const pool = require("./db");
+
+// Routes
+const linksRoute = require("./routes/links");
+app.use("/api/links", linksRoute);
+
+// Railway PORT handling
+const PORT = process.env.PORT || 8080;
+
+app.get("/", (req, res) => {
+  res.send("PostgreSQL TinyLink Server Running!");
 });
 
-// Example route
-app.get('/', (req, res) => {
-  res.send('TinyLink is running!');
+// Must use 0.0.0.0 for Railway
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port " + PORT);
 });
-
-// Dynamic port for Railway
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
